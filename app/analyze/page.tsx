@@ -25,6 +25,15 @@ const SCORE_LABELS: Record<string, string> = {
   aiCitation: "AI引用チェック",
 };
 
+const SCORE_DESCRIPTIONS: Record<string, string> = {
+  structuredData: "Schema.orgなどの構造化データがサイトに実装されているかを評価します。AIはこのデータを「チートシート」として活用し、サービス内容・価格・組織情報を正確に把握します。未実装の場合、AIがサイトの情報を正しく解釈できず、推薦の優先度が下がります。",
+  answerCapsule: "各セクションの冒頭で、AIが直接抜き出せる明確な定義文や回答文があるかを評価します。AIは長い文章全体を読むのではなく、段落の最初の1〜2文を優先的に引用します。「〇〇とは△△です」という形式の宣言的な文章が多いほど高スコアになります。",
+  infoDensity: "本文中に具体的な数値・統計データ・定量的な情報がどれだけ含まれているかを評価します。「業界最高レベル」といった抽象表現よりも「導入企業150社・平均コスト削減20%」のような具体的数値の方がAIに信頼されやすく、引用率が約2.5倍高くなります。",
+  contentLength: "AIが参照できる本文の情報量を評価します。コンテンツが少なすぎると、AIが回答を生成する際に引用できる情報が不足します。ただし文字数だけでなく、ナビゲーションや広告を除いた「実質的な本文」の量で判定しています。",
+  metaInfo: "titleタグとmeta descriptionの内容と品質を評価します。これらはAIがページの主題を最初に判断する手がかりです。適切な長さ（title: 10〜60文字、description: 50〜160文字）で、サービスの内容を具体的に説明しているほど高スコアになります。",
+  aiCitation: "Perplexity AIに実際に質問を投げ、あなたのサイトが回答の中で言及・引用されるかをリアルタイムで検証します。ソースとして引用された場合は20点、回答内で言及された場合は12点、認識されなかった場合は2点となります。このスコアが最も直接的なAI可視性の指標です。",
+};
+
 function getGrade(total: number) {
   if (total >= 80) return { label: "S", color: "text-green-400", msg: "AIに引用されやすい優秀なサイトです" };
   if (total >= 60) return { label: "A", color: "text-blue-400", msg: "AIに認識されています。改善でさらに上位を狙えます" };
@@ -128,17 +137,20 @@ export default function AnalyzePage() {
             <div className="bg-white/3 border border-white/10 rounded-2xl p-6 space-y-5">
               <h2 className="font-bold text-lg">指標の内訳</h2>
               {Object.entries(result.scores).map(([key, score]) => (
-                <div key={key}>
+                <div key={key} className="pb-5 border-b border-white/5 last:border-0">
                   <div className="flex justify-between text-sm mb-2">
-                    <span>{SCORE_LABELS[key]}</span>
+                    <span className="font-medium">{SCORE_LABELS[key]}</span>
                     <span className="text-blue-400 font-bold">{score} / 20</span>
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-3">
                     <div
                       className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
                       style={{ width: `${(score / 20) * 100}%` }}
                     />
                   </div>
+                  <p className="text-xs text-gray-400 leading-relaxed">
+                    {SCORE_DESCRIPTIONS[key]}
+                  </p>
                 </div>
               ))}
             </div>
