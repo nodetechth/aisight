@@ -25,6 +25,9 @@ const SCORE_LABELS: Record<string, string> = {
   aiCitation: "AI引用チェック",
 };
 
+// 有料ロック対象の指標
+const LOCKED_SCORES = ["aiCitation"];
+
 const SCORE_DESCRIPTIONS: Record<string, string> = {
   structuredData: "Schema.orgなどの構造化データがサイトに実装されているかを評価します。AIはこのデータを「チートシート」として活用し、サービス内容・価格・組織情報を正確に把握します。未実装の場合、AIがサイトの情報を正しく解釈できず、推薦の優先度が下がります。",
   answerCapsule: "各セクションの冒頭で、AIが直接抜き出せる明確な定義文や回答文があるかを評価します。AIは長い文章全体を読むのではなく、段落の最初の1〜2文を優先的に引用します。「〇〇とは△△です」という形式の宣言的な文章が多いほど高スコアになります。",
@@ -130,29 +133,65 @@ export default function AnalyzePage() {
                 </div>
                 <div className={`text-6xl font-black ${grade.color}`}>{grade.label}</div>
               </div>
-              <p className="text-gray-300">{grade.msg}</p>
+              <p className="text-gray-300 mb-4">{grade.msg}</p>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-white/10 text-gray-500 w-fit">
+                <span>🔒</span>
+                <span>AI引用状況は有料プランで確認</span>
+              </div>
             </div>
 
             {/* 各指標 */}
             <div className="bg-white/3 border border-white/10 rounded-2xl p-6 space-y-5">
               <h2 className="font-bold text-lg">指標の内訳</h2>
-              {Object.entries(result.scores).map(([key, score]) => (
-                <div key={key} className="pb-5 border-b border-white/5 last:border-0">
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="font-medium">{SCORE_LABELS[key]}</span>
-                    <span className="text-blue-400 font-bold">{score} / 20</span>
+              {Object.entries(result.scores).map(([key, score]) => {
+                const isLocked = LOCKED_SCORES.includes(key);
+                return (
+                  <div key={key} className="pb-5 border-b border-white/5 last:border-0">
+                    <div className="flex justify-between text-sm mb-2">
+                      <span className={`font-medium flex items-center gap-2 ${isLocked ? "text-gray-500" : ""}`}>
+                        {isLocked && <span className="text-xs">🔒</span>}
+                        {SCORE_LABELS[key]}
+                      </span>
+                      {isLocked ? (
+                        <span className="text-xs text-gray-600 border border-white/10 rounded-full px-2 py-0.5">
+                          有料プランで解放
+                        </span>
+                      ) : (
+                        <span className="text-blue-400 font-bold">{score} / 20</span>
+                      )}
+                    </div>
+
+                    {/* スコアバー */}
+                    <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-3">
+                      {isLocked ? (
+                        <div className="h-full w-full bg-white/10 rounded-full" style={{ filter: "blur(3px)" }} />
+                      ) : (
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
+                          style={{ width: `${(score / 20) * 100}%` }}
+                        />
+                      )}
+                    </div>
+
+                    {/* 説明文 */}
+                    {isLocked ? (
+                      <div className="px-4 py-3 rounded-xl bg-blue-500/5 border border-blue-500/15 text-center">
+                        <p className="text-xs text-gray-500 mb-2">
+                          Perplexity AIに実際に質問し、あなたのサイトが引用されるか<br />
+                          リアルタイムで検証します。最も直接的なAI可視性の指標です。
+                        </p>
+                        <button className="text-xs text-blue-400 hover:text-blue-300 font-medium transition">
+                          有料プランで確認する →
+                        </button>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 leading-relaxed">
+                        {SCORE_DESCRIPTIONS[key]}
+                      </p>
+                    )}
                   </div>
-                  <div className="h-1.5 bg-white/5 rounded-full overflow-hidden mb-3">
-                    <div
-                      className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-1000"
-                      style={{ width: `${(score / 20) * 100}%` }}
-                    />
-                  </div>
-                  <p className="text-xs text-gray-400 leading-relaxed">
-                    {SCORE_DESCRIPTIONS[key]}
-                  </p>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* シェアボタン */}
