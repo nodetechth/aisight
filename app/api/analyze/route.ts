@@ -114,28 +114,27 @@ function scoreInfoDensity(html: string): number {
 
 // ④ コンテンツ長：文字数だけでなく「情報として読める本文」の密度を見る
 function scoreContentLength(html: string): number {
-  // nav・header・footer・script・styleを除去して本文だけ取る
+  // __NEXT_DATA__ などのJSONデータブロックを除去
   const cleaned = html
     .replace(/<script[\s\S]*?<\/script>/gi, "")
     .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
-    .replace(/<header[\s\S]*?<\/header>/gi, "")
-    .replace(/<footer[\s\S]*?<\/footer>/gi, "");
+    .replace(/<!--[\s\S]*?-->/g, "");
 
+  // タグを除去してテキストのみ取得
   const text = cleaned
     .replace(/<[^>]+>/g, " ")
+    .replace(/&[a-z]+;/gi, " ")   // HTMLエンティティを除去
     .replace(/\s+/g, " ")
     .trim();
 
-  // ナビやUIテキストを除いた「本文らしい段落」の数を数える
-  const paragraphs = (text.match(/[^\s。．]{20,}/g) || []);
-  const meaningfulLength = paragraphs.join("").length;
+  // 20文字以上の連続テキスト（意味のある文章）を抽出
+  const sentences = text.match(/[^\s。．]{10,}/g) || [];
+  const meaningfulLength = sentences.join("").length;
 
-  // 本文として意味のある文字数で判定（閾値を引き上げ）
-  if (meaningfulLength >= 4000) return 20;
-  if (meaningfulLength >= 2500) return 15;
-  if (meaningfulLength >= 1500) return 8;
-  if (meaningfulLength >= 500) return 4;
+  if (meaningfulLength >= 3000) return 20;
+  if (meaningfulLength >= 1500) return 15;
+  if (meaningfulLength >= 800)  return 8;
+  if (meaningfulLength >= 300)  return 4;
   return 0;
 }
 

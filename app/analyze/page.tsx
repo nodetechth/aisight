@@ -10,7 +10,9 @@ type ScoreResult = {
     infoDensity: number;
     contentLength: number;
     metaInfo: number;
+    aiCitation: number;
   };
+  cited: boolean;
   checkedAt: string;
 };
 
@@ -20,6 +22,7 @@ const SCORE_LABELS: Record<string, string> = {
   infoDensity: "情報密度",
   contentLength: "コンテンツ長",
   metaInfo: "メタ情報",
+  aiCitation: "AI引用チェック",
 };
 
 function getGrade(total: number) {
