@@ -350,7 +350,28 @@ export default function AnalyzePage() {
 
             {/* シェアボタン */}
             <a
-              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${result.url} のAIEOスコアは${result.total}点でした！ #AIEO #AISight\nhttps://aisight.nodetech.jp/analyze`)}`}
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                [
+                  `🤖 AIEOスコア診断結果`,
+                  `📌 ${result.url}`,
+                  ``,
+                  `総合スコア：${result.total}点 / グレード：${result.total >= 80 ? "S" : result.total >= 60 ? "A" : result.total >= 40 ? "B" : "C"}`,
+                  ``,
+                  `📊 各指標スコア`,
+                  `構造化データ：${result.scores.structuredData}/20`,
+                  `回答カプセル：${result.scores.answerCapsule}/20`,
+                  `情報密度：${result.scores.infoDensity}/20`,
+                  `コンテンツ量：${result.scores.contentLength}/20`,
+                  `メタ情報：${result.scores.metaInfo}/20`,
+                  ``,
+                  result.cited ? `✅ AIに認識されています` : `❌ AIに認識されていません`,
+                  ``,
+                  `あなたのサイトも診断してみる👇`,
+                  `https://aisight.nodetech.jp`,
+                  ``,
+                  `#AIEO #AISight`,
+                ].join("\n")
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="block w-full py-3.5 rounded-xl bg-sky-500/10 border border-sky-500/30 text-sky-400 font-medium text-center hover:bg-sky-500/20 transition"
