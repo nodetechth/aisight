@@ -44,7 +44,7 @@ export default function Home() {
           無料で診断する
         </a>
         <button
-          onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth" })}
+          onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition"
         >
           先行登録する
