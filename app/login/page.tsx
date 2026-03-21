@@ -31,10 +31,11 @@ function LoginForm() {
   };
 
   const handleGoogleLogin = async () => {
+    const redirect = searchParams.get("redirect") || "/analyze";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL ?? location.origin}/auth/callback?next=${redirectTo}`,
+        redirectTo: `${location.origin}${redirect}`,
       },
     });
   };
