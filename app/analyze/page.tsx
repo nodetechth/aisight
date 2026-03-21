@@ -180,9 +180,9 @@ export default function AnalyzePage() {
                           Perplexity AIに実際に質問し、あなたのサイトが引用されるか<br />
                           リアルタイムで検証します。最も直接的なAI可視性の指標です。
                         </p>
-                        <button className="text-xs text-blue-400 hover:text-blue-300 font-medium transition">
+                        <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 font-medium transition">
                           有料プランで確認する →
-                        </button>
+                        </a>
                       </div>
                     ) : (
                       <p className="text-xs text-gray-400 leading-relaxed">
