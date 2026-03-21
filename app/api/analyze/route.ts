@@ -22,14 +22,14 @@ export async function POST(req: NextRequest) {
       infoDensity,
       contentLength,
       metaInfo,
-      aiCitation,
+      aiCitationReport,
     ] = await Promise.all([
       Promise.resolve(scoreStructuredData(html)),
       Promise.resolve(scoreAnswerCapsule(html)),
       Promise.resolve(scoreInfoDensity(html)),
       Promise.resolve(scoreContentLength(html)),
       Promise.resolve(scoreMetaInfo(html)),
-      scoreAICitation(url),
+      scoreAICitationWithReport(url),
     ]);
 
     const scores = {
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
       infoDensity,
       contentLength,
       metaInfo,
-      aiCitation,
+      aiCitation: aiCitationReport.score,
     };
 
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
@@ -47,7 +47,14 @@ export async function POST(req: NextRequest) {
       url,
       total,
       scores,
-      cited: aiCitation > 0,
+      cited: aiCitationReport.cited,
+      aiCitationReport: {
+        industry: aiCitationReport.industry,
+        region: aiCitationReport.region,
+        queries: aiCitationReport.queries,
+        citedCount: aiCitationReport.queries.filter(q => q.cited).length,
+        totalQueries: aiCitationReport.queries.length,
+      },
       checkedAt: new Date().toISOString(),
     });
   } catch (e) {
@@ -166,49 +173,109 @@ function scoreMetaInfo(html: string): number {
   return Math.min(titleScore + descScore, 20);
 }
 
-// ⑥ AI引用チェック：Perplexity APIに実際に質問してドメインが言及されるか確認
-async function scoreAICitation(url: string): Promise<number> {
+// ⑥ サイト情報から業種・地域を推定してローカルクエリを生成・検証する
+async function scoreAICitationWithReport(url: string): Promise<{
+  score: number;
+  cited: boolean;
+  industry: string;
+  region: string;
+  queries: { query: string; cited: boolean; context: string }[];
+}> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
-  if (!apiKey) return 0;
+  if (!apiKey) return {
+    score: 0, cited: false, industry: "不明", region: "不明", queries: []
+  };
 
-  // URLからドメインを抽出
   const domain = new URL(url).hostname.replace("www.", "");
 
-  // サイトのタイトルや業種を推測するためのシンプルなプロンプト
-  const prompt = `「${domain}」というウェブサイトについて教えてください。
-このサイトを知っていますか？どのようなサービスや情報を提供していますか？`;
-
+  // Step1: 業種・地域を推定
+  let industry = "不明";
+  let region = "不明";
   try {
-    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+    const inferRes = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "llama-3.1-sonar-small-128k-online",
-        messages: [{ role: "user", content: prompt }],
-        max_tokens: 300,
+        model: "sonar",
+        messages: [{
+          role: "user",
+          content: `以下のウェブサイトのドメイン「${domain}」について、サイトの業種と所在地域を日本語で簡潔に答えてください。
+JSON形式で回答してください：{"industry": "業種", "region": "都道府県または市区町村"}
+わからない場合は{"industry": "不明", "region": "不明"}と答えてください。`
+        }],
+        max_tokens: 100,
       }),
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(10000),
     });
+    const inferData = await inferRes.json();
+    const inferText = inferData.choices?.[0]?.message?.content ?? "";
+    const jsonMatch = inferText.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      industry = parsed.industry || "不明";
+      region = parsed.region || "不明";
+    }
+  } catch { /* 推定失敗時はデフォルト値を使う */ }
 
-    const data = await res.json();
-    const answer = data.choices?.[0]?.message?.content ?? "";
-
-    // 回答にドメインまたはサイト名が含まれているかチェック
-    const domainMentioned = answer.toLowerCase().includes(domain.toLowerCase());
-
-    // 引用ソース（citations）にドメインが含まれているかもチェック
-    const citations: string[] = data.citations ?? [];
-    const citedInSources = citations.some((c: string) =>
-      c.toLowerCase().includes(domain.toLowerCase())
-    );
-
-    if (citedInSources) return 20;   // ソースとして実際に引用された
-    if (domainMentioned) return 12;  // 回答内で言及された
-    return 2;                         // 言及なし（存在を知られていない）
-  } catch {
-    return 0; // APIエラー時はスコアに影響させない
+  // Step2: ローカルクエリを生成
+  const localQueries: string[] = [];
+  if (industry !== "不明" && region !== "不明") {
+    localQueries.push(`${region} ${industry} おすすめ`);
+    localQueries.push(`${region} ${industry} 評判の良い会社`);
+    localQueries.push(`${industry} ${region} 依頼先`);
+  } else {
+    localQueries.push(`${domain} サービス内容`);
+    localQueries.push(`${domain} 評判`);
+    localQueries.push(`${domain} 口コミ`);
   }
+
+  // Step3: 各クエリでPerplexityに投げて引用チェック
+  const results: { query: string; cited: boolean; context: string }[] = [];
+  for (const query of localQueries) {
+    try {
+      const res = await fetch("https://api.perplexity.ai/chat/completions", {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: "sonar",
+          messages: [{ role: "user", content: query }],
+          max_tokens: 400,
+        }),
+        signal: AbortSignal.timeout(12000),
+      });
+      const data = await res.json();
+      const answer = data.choices?.[0]?.message?.content ?? "";
+      const citations: string[] = data.citations ?? [];
+      const domainMentioned = answer.toLowerCase().includes(domain.toLowerCase());
+      const citedInSources = citations.some((c: string) =>
+        c.toLowerCase().includes(domain.toLowerCase())
+      );
+      results.push({
+        query,
+        cited: domainMentioned || citedInSources,
+        context: domainMentioned
+          ? answer.slice(0, 150).trim() + "..."
+          : "",
+      });
+    } catch {
+      results.push({ query, cited: false, context: "" });
+    }
+  }
+
+  const citedCount = results.filter(r => r.cited).length;
+  const score = citedCount === 3 ? 20 : citedCount === 2 ? 14 : citedCount === 1 ? 8 : 2;
+
+  return {
+    score,
+    cited: citedCount > 0,
+    industry,
+    region,
+    queries: results,
+  };
 }

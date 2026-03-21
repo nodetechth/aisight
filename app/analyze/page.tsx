@@ -6,6 +6,7 @@ import NavBar from "@/app/components/NavBar";
 type ScoreResult = {
   url: string;
   total: number;
+  cited: boolean;
   scores: {
     structuredData: number;
     answerCapsule: number;
@@ -14,7 +15,13 @@ type ScoreResult = {
     metaInfo: number;
     aiCitation: number;
   };
-  cited: boolean;
+  aiCitationReport?: {
+    industry: string;
+    region: string;
+    queries: { query: string; cited: boolean; context: string }[];
+    citedCount: number;
+    totalQueries: number;
+  };
   checkedAt: string;
 };
 
@@ -220,6 +227,48 @@ export default function AnalyzePage() {
                 );
               })}
             </div>
+
+            {/* AI引用チェック詳細レポート */}
+            {isPro && result.aiCitationReport && (
+              <div className="mt-6 p-5 rounded-2xl bg-white/3 border border-white/5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-white">AI引用チェック詳細</h3>
+                  <span className="text-xs text-gray-500">
+                    推定業種：{result.aiCitationReport.industry}
+                    推定地域：{result.aiCitationReport.region}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2 mb-4">
+                  <span className={`text-lg font-black ${result.cited ? "text-green-400" : "text-red-400"}`}>
+                    {result.aiCitationReport.citedCount}/{result.aiCitationReport.totalQueries}クエリで引用
+                  </span>
+                  <span className="text-sm text-gray-500">
+                    （引用率 {Math.round(result.aiCitationReport.citedCount / result.aiCitationReport.totalQueries * 100)}%）
+                  </span>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  {result.aiCitationReport.queries.map((q, i) => (
+                    <div key={i} className={`p-3 rounded-xl border text-sm ${
+                      q.cited
+                        ? "bg-green-500/5 border-green-500/20"
+                        : "bg-white/2 border-white/5"
+                    }`}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{q.cited ? "✅" : "❌"}</span>
+                        <span className="text-gray-300 font-medium">「{q.query}」</span>
+                      </div>
+                      {q.cited && q.context && (
+                        <p className="text-xs text-gray-500 pl-6 leading-relaxed">
+                          {q.context}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* シェアボタン */}
             <a
