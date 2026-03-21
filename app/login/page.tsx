@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
 import { useRouter } from "next/navigation";
 
@@ -9,15 +9,7 @@ function LoginForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [redirectTo, setRedirectTo] = useState("/analyze");
   const router = useRouter();
-
-  useEffect(() => {
-    // ブラウザのURLから直接 redirect パラメータを取得
-    const params = new URLSearchParams(window.location.search);
-    const redirect = params.get("redirect");
-    if (redirect) setRedirectTo(redirect);
-  }, []);
 
   const supabase = createClient();
 
@@ -32,7 +24,11 @@ function LoginForm() {
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setMessage("メールアドレスまたはパスワードが正しくありません");
-      else router.push(redirectTo);
+      else {
+        const params = new URLSearchParams(window.location.search);
+        const redirect = params.get("redirect") || "/analyze";
+        router.push(redirect);
+      }
     }
     setLoading(false);
   };
@@ -40,7 +36,8 @@ function LoginForm() {
   const handleGoogleLogin = async () => {
     const params = new URLSearchParams(window.location.search);
     const redirect = params.get("redirect") || "/analyze";
-    await supabase.auth.signInWithOAuth({
+    const supabaseClient = createClient();
+    await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}${redirect}`,
