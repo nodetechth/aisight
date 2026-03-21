@@ -26,14 +26,23 @@ export default function UpgradePage() {
       return;
     }
     setLoading(true);
-    const res = await fetch("/api/stripe/checkout", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: user.id, email: user.email }),
-    });
-    const { url } = await res.json();
-    if (url) window.location.href = url;
-    setLoading(false);
+    try {
+      const res = await fetch("/api/stripe/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, email: user.email }),
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("決済URLの取得に失敗しました。しばらくしてから再度お試しください。");
+      }
+    } catch (e) {
+      alert("エラーが発生しました。しばらくしてから再度お試しください。");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
