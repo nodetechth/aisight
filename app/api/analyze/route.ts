@@ -43,6 +43,8 @@ export async function POST(req: NextRequest) {
 
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
 
+    const actionPlan = await generateActionPlan(scores, url);
+
     return NextResponse.json({
       url,
       total,
@@ -54,7 +56,9 @@ export async function POST(req: NextRequest) {
         queries: aiCitationReport.queries,
         citedCount: aiCitationReport.queries.filter(q => q.cited).length,
         totalQueries: aiCitationReport.queries.length,
+        competitors: aiCitationReport.competitors,
       },
+      actionPlan,
       checkedAt: new Date().toISOString(),
     });
   } catch (e) {
@@ -180,10 +184,11 @@ async function scoreAICitationWithReport(url: string): Promise<{
   industry: string;
   region: string;
   queries: { query: string; cited: boolean; context: string }[];
+  competitors: { query: string; sites: string[] }[];
 }> {
   const apiKey = process.env.PERPLEXITY_API_KEY;
   if (!apiKey) return {
-    score: 0, cited: false, industry: "不明", region: "不明", queries: []
+    score: 0, cited: false, industry: "不明", region: "不明", queries: [], competitors: []
   };
 
   const domain = new URL(url).hostname.replace("www.", "");
@@ -310,11 +315,96 @@ JSON形式で回答してください：{"industry": "業種", "region": "都道
   const citedCount = results.filter(r => r.cited).length;
   const score = citedCount === 3 ? 20 : citedCount === 2 ? 14 : citedCount === 1 ? 8 : 2;
 
+  // Step4: 競合比較（引用されたクエリで競合サイトを抽出）
+  const competitors: { query: string; sites: string[] }[] = [];
+  for (const result of results) {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{ role: "user", content: result.query }],
+        max_tokens: 200,
+      }),
+      signal: AbortSignal.timeout(12000),
+    });
+    const data = await res.json();
+    const citations: string[] = data.citations ?? [];
+    const competitorSites = citations
+      .map((c: string) => {
+        try { return new URL(c).hostname.replace("www.", ""); } catch { return ""; }
+      })
+      .filter((h: string) => h && !h.includes(domain))
+      .filter((h: string, i: number, arr: string[]) => arr.indexOf(h) === i)
+      .slice(0, 3);
+    if (competitorSites.length > 0) {
+      competitors.push({ query: result.query, sites: competitorSites });
+    }
+  }
+
   return {
     score,
     cited: citedCount > 0,
     industry,
     region,
     queries: results,
+    competitors,
   };
+}
+
+async function generateActionPlan(
+  scores: Record<string, number>,
+  url: string
+): Promise<{ priority: "high" | "medium" | "low"; item: string; action: string }[]> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) return [];
+
+  const scoreDescriptions = [
+    { key: "structuredData", label: "構造化データ（Schema.org）", score: scores.structuredData, max: 20 },
+    { key: "answerCapsule", label: "回答カプセル（H2/H3直後の定義文）", score: scores.answerCapsule, max: 20 },
+    { key: "infoDensity", label: "情報密度（数値・実績データの量）", score: scores.infoDensity, max: 20 },
+    { key: "contentLength", label: "コンテンツ量", score: scores.contentLength, max: 20 },
+    { key: "metaInfo", label: "メタ情報（title・description）", score: scores.metaInfo, max: 20 },
+  ];
+
+  const lowScores = scoreDescriptions
+    .sort((a, b) => (a.score / a.max) - (b.score / b.max))
+    .slice(0, 3);
+
+  const prompt = `以下はウェブサイト「${url}」のAIEOスコア診断結果です。
+スコアが低い項目について、具体的な改善アクションを提案してください。
+
+${lowScores.map(s => `- ${s.label}：${s.score}/${s.max}点`).join("\n")}
+
+以下のJSON形式で3つの改善アクションを返してください。
+優先度は high/medium/low のいずれかで指定してください。
+[
+  {"priority": "high", "item": "改善項目名", "action": "具体的な改善アクション（1〜2文）"},
+  ...
+]
+JSON以外のテキストは含めないでください。`;
+
+  try {
+    const res = await fetch("https://api.perplexity.ai/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "sonar",
+        messages: [{ role: "user", content: prompt }],
+        max_tokens: 500,
+      }),
+      signal: AbortSignal.timeout(15000),
+    });
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content ?? "";
+    const jsonMatch = text.match(/\[[\s\S]*\]/);
+    if (jsonMatch) return JSON.parse(jsonMatch[0]);
+  } catch {}
+  return [];
 }

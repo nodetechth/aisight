@@ -21,7 +21,13 @@ type ScoreResult = {
     queries: { query: string; cited: boolean; context: string }[];
     citedCount: number;
     totalQueries: number;
+    competitors: { query: string; sites: string[] }[];
   };
+  actionPlan?: {
+    priority: "high" | "medium" | "low";
+    item: string;
+    action: string;
+  }[];
   checkedAt: string;
 };
 
@@ -267,6 +273,78 @@ export default function AnalyzePage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* 競合比較 - Proのみ */}
+            {isPro ? (
+              result.aiCitationReport?.competitors && result.aiCitationReport.competitors.length > 0 && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">🏆 競合比較</h3>
+                  <p className="text-xs text-gray-500 mb-3">同じクエリであなたの代わりに引用されているサイト</p>
+                  <div className="flex flex-col gap-2">
+                    {result.aiCitationReport.competitors.map((c, i) => (
+                      <div key={i} className="p-3 rounded-xl bg-white/2 border border-white/5">
+                        <p className="text-xs text-gray-500 mb-1">「{c.query}」で引用されたサイト</p>
+                        <div className="flex flex-wrap gap-2">
+                          {c.sites.map((site, j) => (
+                            <span key={j} className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400">
+                              {site}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>競合比較スコア</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
+              </div>
+            )}
+
+            {/* 改善アクションプラン - Proのみ */}
+            {isPro ? (
+              result.actionPlan && result.actionPlan.length > 0 && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">🎯 改善アクションプラン</h3>
+                  <div className="flex flex-col gap-3">
+                    {result.actionPlan.map((plan, i) => (
+                      <div key={i} className="flex gap-3 p-3 rounded-xl bg-white/2 border border-white/5">
+                        <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-bold h-fit ${
+                          plan.priority === "high"
+                            ? "bg-red-500/20 text-red-400"
+                            : plan.priority === "medium"
+                            ? "bg-yellow-500/20 text-yellow-400"
+                            : "bg-gray-500/20 text-gray-400"
+                        }`}>
+                          {plan.priority === "high" ? "優先度：高" : plan.priority === "medium" ? "優先度：中" : "優先度：低"}
+                        </span>
+                        <div>
+                          <p className="text-sm font-medium text-white mb-1">{plan.item}</p>
+                          <p className="text-xs text-gray-400 leading-relaxed">{plan.action}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>改善アクションプラン</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
               </div>
             )}
 
