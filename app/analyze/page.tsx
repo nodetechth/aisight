@@ -66,6 +66,7 @@ export default function AnalyzePage() {
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [error, setError] = useState("");
   const [isPro, setIsPro] = useState(false);
+  const [remainingCount, setRemainingCount] = useState<number | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
@@ -74,10 +75,19 @@ export default function AnalyzePage() {
       if (!user) return;
       const { data } = await supabase
         .from("user_plans")
-        .select("plan")
+        .select("plan, monthly_analysis_count, analysis_count_reset_at")
         .eq("id", user.id)
         .single();
-      if (data?.plan === "pro") setIsPro(true);
+      if (data?.plan === "pro") {
+        setIsPro(true);
+        const resetAt = new Date(data.analysis_count_reset_at);
+        const now = new Date();
+        const shouldReset =
+          now.getFullYear() !== resetAt.getFullYear() ||
+          now.getMonth() !== resetAt.getMonth();
+        const count = shouldReset ? 0 : (data.monthly_analysis_count ?? 0);
+        setRemainingCount(5 - count);
+      }
     };
     checkPlan();
   }, []);
@@ -90,14 +100,30 @@ export default function AnalyzePage() {
     setResult(null);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
+
       const res = await fetch("/api/analyze", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token
+            ? { "Authorization": `Bearer ${session.access_token}` }
+            : {}),
+        },
         body: JSON.stringify({ url: normalized }),
       });
+
       const data = await res.json();
+
+      if (res.status === 429) {
+        setError(data.message || "今月の診断回数上限に達しました。");
+        setLoading(false);
+        return;
+      }
+
       if (data.error) throw new Error(data.error);
       setResult(data);
+      if (remainingCount !== null) setRemainingCount(prev => prev !== null ? prev - 1 : null);
     } catch (e) {
       setError("診断に失敗しました。URLを確認してください。");
     } finally {
@@ -133,6 +159,11 @@ export default function AnalyzePage() {
             {loading ? "診断中..." : "診断する"}
           </button>
         </div>
+        {isPro && remainingCount !== null && (
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            今月の残り診断回数：<span className={remainingCount <= 1 ? "text-red-400 font-bold" : "text-blue-400 font-bold"}>{remainingCount}回</span> / 5回
+          </p>
+        )}
 
         {error && (
           <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm mb-6">

@@ -1,10 +1,81 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
+
+async function checkAndIncrementAnalysisCount(userId: string): Promise<{
+  allowed: boolean;
+  remaining: number;
+  isPro: boolean;
+}> {
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  const { data } = await supabase
+    .from("user_plans")
+    .select("plan, monthly_analysis_count, analysis_count_reset_at")
+    .eq("id", userId)
+    .single();
+
+  if (!data || data.plan !== "pro") {
+    return { allowed: true, remaining: 999, isPro: false };
+  }
+
+  const MONTHLY_LIMIT = 5;
+  const now = new Date();
+  const resetAt = new Date(data.analysis_count_reset_at);
+
+  const shouldReset =
+    now.getFullYear() !== resetAt.getFullYear() ||
+    now.getMonth() !== resetAt.getMonth();
+
+  const currentCount = shouldReset ? 0 : (data.monthly_analysis_count ?? 0);
+
+  if (currentCount >= MONTHLY_LIMIT) {
+    return { allowed: false, remaining: 0, isPro: true };
+  }
+
+  await supabase
+    .from("user_plans")
+    .update({
+      monthly_analysis_count: currentCount + 1,
+      analysis_count_reset_at: shouldReset ? now.toISOString() : data.analysis_count_reset_at,
+      updated_at: now.toISOString(),
+    })
+    .eq("id", userId);
+
+  return { allowed: true, remaining: MONTHLY_LIMIT - (currentCount + 1), isPro: true };
+}
 
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
 
   if (!url || !url.startsWith("http")) {
     return NextResponse.json({ error: "invalid_url" }, { status: 400 });
+  }
+
+  // Authorizationヘッダーからユーザーを取得
+  const authHeader = req.headers.get("authorization");
+  const accessToken = authHeader?.replace("Bearer ", "");
+
+  let analysisLimit = { allowed: true, remaining: 999, isPro: false };
+
+  if (accessToken) {
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
+    const { data: { user } } = await supabase.auth.getUser(accessToken);
+    if (user) {
+      analysisLimit = await checkAndIncrementAnalysisCount(user.id);
+    }
+  }
+
+  if (!analysisLimit.allowed) {
+    return NextResponse.json(
+      { error: "LIMIT_EXCEEDED", message: "今月の診断回数（5回）の上限に達しました。来月1日にリセットされます。" },
+      { status: 429 }
+    );
   }
 
   try {
