@@ -34,13 +34,25 @@ function LoginForm() {
   };
 
   const handleGoogleLogin = async () => {
-    const params = new URLSearchParams(window.location.search);
-    const redirect = params.get("redirect") || "/analyze";
     const supabaseClient = createClient();
+
+    // URLから redirect パラメータを取得
+    const params = new URLSearchParams(window.location.search);
+    const redirectPath = params.get("redirect") || "/analyze";
+
+    // 完全なURLを構築
+    const redirectTo = `https://aisight.nodetech.jp${redirectPath}`;
+
+    console.log("redirectTo:", redirectTo); // デバッグ用
+
     await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}${redirect}`,
+        redirectTo,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
   };
