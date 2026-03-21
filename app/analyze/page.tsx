@@ -1,5 +1,6 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase";
 
 type ScoreResult = {
   url: string;
@@ -50,6 +51,22 @@ export default function AnalyzePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ScoreResult | null>(null);
   const [error, setError] = useState("");
+  const [isPro, setIsPro] = useState(false);
+  const supabase = createClient();
+
+  useEffect(() => {
+    const checkPlan = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("user_plans")
+        .select("plan")
+        .eq("id", user.id)
+        .single();
+      if (data?.plan === "pro") setIsPro(true);
+    };
+    checkPlan();
+  }, []);
 
   const handleAnalyze = async () => {
     if (!url) return;
@@ -134,17 +151,28 @@ export default function AnalyzePage() {
                 <div className={`text-6xl font-black ${grade.color}`}>{grade.label}</div>
               </div>
               <p className="text-gray-300 mb-4">{grade.msg}</p>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-white/10 text-gray-500 w-fit">
-                <span>🔒</span>
-                <span>AI引用状況は有料プランで確認</span>
-              </div>
+              {isPro ? (
+                <div className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border w-fit ${
+                  result.cited
+                    ? "bg-green-500/10 border-green-500/30 text-green-400"
+                    : "bg-red-500/10 border-red-500/30 text-red-400"
+                }`}>
+                  <span>{result.cited ? "✓" : "✗"}</span>
+                  <span>{result.cited ? "AIに認識されています" : "AIに認識されていません"}</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium border border-white/10 text-gray-500 w-fit">
+                  <span>🔒</span>
+                  <span>AI引用状況は有料プランで確認</span>
+                </div>
+              )}
             </div>
 
             {/* 各指標 */}
             <div className="bg-white/3 border border-white/10 rounded-2xl p-6 space-y-5">
               <h2 className="font-bold text-lg">指標の内訳</h2>
               {Object.entries(result.scores).map(([key, score]) => {
-                const isLocked = LOCKED_SCORES.includes(key);
+                const isLocked = LOCKED_SCORES.includes(key) && !isPro;
                 return (
                   <div key={key} className="pb-5 border-b border-white/5 last:border-0">
                     <div className="flex justify-between text-sm mb-2">
