@@ -1,7 +1,7 @@
 "use client";
-import { useState, Suspense } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { createClient } from "@/lib/supabase";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 
 function LoginForm() {
   const [email, setEmail] = useState("");
@@ -9,9 +9,16 @@ function LoginForm() {
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [redirectTo, setRedirectTo] = useState("/analyze");
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirect") || "/analyze";
+
+  useEffect(() => {
+    // ブラウザのURLから直接 redirect パラメータを取得
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect");
+    if (redirect) setRedirectTo(redirect);
+  }, []);
+
   const supabase = createClient();
 
   const handleEmailAuth = async (e: React.FormEvent) => {
@@ -31,11 +38,12 @@ function LoginForm() {
   };
 
   const handleGoogleLogin = async () => {
-    const redirect = searchParams.get("redirect") || "/analyze";
+    const params = new URLSearchParams(window.location.search);
+    const redirect = params.get("redirect") || "/analyze";
     await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${location.origin}${redirect}`,
+        redirectTo: `${window.location.origin}${redirect}`,
       },
     });
   };
