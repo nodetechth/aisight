@@ -35,24 +35,14 @@ function LoginForm() {
 
   const handleGoogleLogin = async () => {
     const supabaseClient = createClient();
-
-    // URLから redirect パラメータを取得
     const params = new URLSearchParams(window.location.search);
     const redirectPath = params.get("redirect") || "/analyze";
-
-    // 完全なURLを構築
-    const redirectTo = `https://aisight.nodetech.jp${redirectPath}`;
-
-    console.log("redirectTo:", redirectTo); // デバッグ用
-
+    // コールバック後に使うためlocalStorageに保存
+    localStorage.setItem("oauth_redirect", redirectPath);
     await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo,
-        queryParams: {
-          access_type: "offline",
-          prompt: "consent",
-        },
+        redirectTo: "https://aisight.nodetech.jp/auth/callback",
       },
     });
   };
