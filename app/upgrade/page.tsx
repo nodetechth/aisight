@@ -1,8 +1,37 @@
 "use client";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
 
 export default function UpgradePage() {
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null);
   const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user) {
+        setUser({ id: data.user.id, email: data.user.email! });
+      }
+    });
+  }, []);
+
+  const handleUpgrade = async () => {
+    if (!user) {
+      router.push("/login?redirect=/upgrade");
+      return;
+    }
+    setLoading(true);
+    const res = await fetch("/api/stripe/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId: user.id, email: user.email }),
+    });
+    const { url } = await res.json();
+    if (url) window.location.href = url;
+    setLoading(false);
+  };
 
   return (
     <main className="min-h-screen bg-[#080C14] text-white px-6 py-16">
@@ -10,10 +39,16 @@ export default function UpgradePage() {
         <a href="/" className="text-xl font-bold tracking-tight">
           AI<span className="text-blue-500">Sight</span>
         </a>
+        {user ? (
+          <span className="text-xs text-gray-500">{user.email}</span>
+        ) : (
+          <a href="/login" className="text-sm text-blue-400 hover:text-blue-300">
+            ログイン
+          </a>
+        )}
       </nav>
 
       <div className="max-w-xl mx-auto pt-16 text-center">
-        {/* ヘッダー */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs mb-8">
           🔒 Proプラン限定機能
         </div>
@@ -25,14 +60,13 @@ export default function UpgradePage() {
           あなたのサイトが引用されるかをリアルタイムで検証します。
         </p>
 
-        {/* Why it matters */}
         <div className="grid grid-cols-1 gap-4 mb-12 text-left">
           {[
             ["🤖", "リアルタイム検証", "実際のAIエンジンに質問を投げて、あなたのサイトが回答に含まれるかを直接確認します。"],
             ["📈", "改善を数値で確認", "サイトを改善した後に再診断することで、AIへの可視性が上がったかを追跡できます。"],
             ["🏆", "競合との差を把握", "競合サイトのAI引用スコアと比較して、今何が足りないかを明確にします。"],
           ].map(([icon, title, desc]) => (
-            <div key={title} className="flex gap-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+            <div key={title as string} className="flex gap-4 p-5 rounded-2xl bg-white/3 border border-white/5">
               <div className="text-2xl">{icon}</div>
               <div>
                 <div className="font-bold mb-1">{title}</div>
@@ -42,9 +76,10 @@ export default function UpgradePage() {
           ))}
         </div>
 
-        {/* 料金 */}
         <div className="p-8 rounded-2xl bg-white/3 border border-blue-500/20 mb-8">
-          <div className="text-5xl font-black mb-2">¥980<span className="text-xl font-normal text-gray-400">/月</span></div>
+          <div className="text-5xl font-black mb-2">
+            ¥980<span className="text-xl font-normal text-gray-400">/月</span>
+          </div>
           <p className="text-gray-400 text-sm mb-6">いつでもキャンセル可能</p>
           <ul className="text-sm text-left space-y-3 mb-8">
             {[
@@ -60,12 +95,15 @@ export default function UpgradePage() {
             ))}
           </ul>
           <button
-            onClick={() => router.push("/login")}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-500 rounded-xl font-bold text-lg transition"
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="w-full py-4 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 rounded-xl font-bold text-lg transition"
           >
-            Proプランを始める →
+            {loading ? "処理中..." : user ? "Proプランを始める →" : "ログインして始める →"}
           </button>
-          <p className="text-xs text-gray-600 mt-3">まずはアカウント登録から。決済はStripeで安全に処理されます。</p>
+          <p className="text-xs text-gray-600 mt-3">
+            決済はStripeで安全に処理されます。
+          </p>
         </div>
       </div>
     </main>
