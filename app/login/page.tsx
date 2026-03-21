@@ -37,12 +37,14 @@ function LoginForm() {
     const supabaseClient = createClient();
     const params = new URLSearchParams(window.location.search);
     const redirectPath = params.get("redirect") || "/analyze";
-    // コールバック後に使うためlocalStorageに保存
     localStorage.setItem("oauth_redirect", redirectPath);
     await supabaseClient.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: "https://aisight.nodetech.jp/auth/callback",
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
   };
