@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
+import NavBar from "@/app/components/NavBar";
 
 type ScoreResult = {
   url: string;
@@ -95,9 +96,7 @@ export default function AnalyzePage() {
 
   return (
     <main className="min-h-screen bg-[#080C14] text-white px-6 py-16">
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-[#080C14]/90 backdrop-blur border-b border-white/5">
-        <a href="/" className="text-xl font-bold tracking-tight">AI<span className="text-blue-500">Sight</span></a>
-      </nav>
+      <NavBar />
 
       <div className="max-w-2xl mx-auto pt-12">
         <h1 className="text-4xl font-black tracking-tight mb-2">AIEOスコア診断</h1>

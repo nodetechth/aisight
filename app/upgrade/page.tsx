@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
+import NavBar from "@/app/components/NavBar";
 
 export default function UpgradePage() {
   const [loading, setLoading] = useState(false);
@@ -47,18 +48,7 @@ export default function UpgradePage() {
 
   return (
     <main className="min-h-screen bg-[#080C14] text-white px-6 py-16">
-      <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-[#080C14]/90 backdrop-blur border-b border-white/5">
-        <a href="/" className="text-xl font-bold tracking-tight">
-          AI<span className="text-blue-500">Sight</span>
-        </a>
-        {user ? (
-          <span className="text-xs text-gray-500">{user.email}</span>
-        ) : (
-          <a href="/login" className="text-sm text-blue-400 hover:text-blue-300">
-            ログイン
-          </a>
-        )}
-      </nav>
+      <NavBar />
 
       <div className="max-w-xl mx-auto pt-16 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 text-blue-400 text-xs mb-8">
