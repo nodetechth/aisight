@@ -21,7 +21,8 @@ export default function UpgradePage() {
 
   const handleUpgrade = async () => {
     if (!user) {
-      router.push("/login?redirect=%2Fupgrade");
+      localStorage.setItem("oauth_redirect", "/upgrade");
+      router.push("/login");
       return;
     }
     setLoading(true);
