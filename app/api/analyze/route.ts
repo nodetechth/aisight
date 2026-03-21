@@ -252,14 +252,53 @@ JSON形式で回答してください：{"industry": "業種", "region": "都道
       const data = await res.json();
       const answer = data.choices?.[0]?.message?.content ?? "";
       const citations: string[] = data.citations ?? [];
-      const domainMentioned = answer.toLowerCase().includes(domain.toLowerCase());
+
+      // ソースとして引用されているか（最も確実な判定）
       const citedInSources = citations.some((c: string) =>
         c.toLowerCase().includes(domain.toLowerCase())
       );
+
+      // 回答内でポジティブに言及されているか
+      // 「見つかりません」「存在しません」「不明」などの否定文脈を除外する
+      const negativePatterns = [
+        "見つかりません",
+        "存在しません",
+        "情報はありません",
+        "見当たりません",
+        "確認できません",
+        "not found",
+        "no information",
+        "no direct",
+        "could not find",
+        "cannot find",
+        "doesn't appear",
+        "does not appear",
+        "no results",
+      ];
+
+      const answerLower = answer.toLowerCase();
+      const domainInAnswer = answerLower.includes(domain.toLowerCase());
+
+      // ドメインが言及されていても、直後に否定表現が続く場合はfalse
+      let positiveMention = false;
+      if (domainInAnswer) {
+        const domainIndex = answerLower.indexOf(domain.toLowerCase());
+        const surroundingText = answerLower.slice(
+          Math.max(0, domainIndex - 50),
+          domainIndex + 150
+        );
+        const hasNegativeContext = negativePatterns.some(p =>
+          surroundingText.includes(p.toLowerCase())
+        );
+        positiveMention = !hasNegativeContext;
+      }
+
+      const isCited = citedInSources || positiveMention;
+
       results.push({
         query,
-        cited: domainMentioned || citedInSources,
-        context: domainMentioned
+        cited: isCited,
+        context: isCited
           ? answer.slice(0, 150).trim() + "..."
           : "",
       });
