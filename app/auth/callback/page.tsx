@@ -8,7 +8,17 @@ export default function AuthCallback() {
 
   useEffect(() => {
     const supabase = createClient();
-    supabase.auth.getSession().then(({ data }) => {
+
+    const handleCallback = async () => {
+      // PKCE flow: URLの code パラメータをセッションに交換
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get("code");
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code);
+      }
+
+      const { data } = await supabase.auth.getSession();
       if (data.session) {
         const redirectPath = localStorage.getItem("oauth_redirect") || "/analyze";
         localStorage.removeItem("oauth_redirect");
@@ -16,7 +26,9 @@ export default function AuthCallback() {
       } else {
         router.push("/login");
       }
-    });
+    };
+
+    handleCallback();
   }, []);
 
   return (
