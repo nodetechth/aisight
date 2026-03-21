@@ -67,6 +67,7 @@ export default function AnalyzePage() {
   const [error, setError] = useState("");
   const [isPro, setIsPro] = useState(false);
   const [remainingCount, setRemainingCount] = useState<number | null>(null);
+  const [progress, setProgress] = useState(0);
   const supabase = createClient();
 
   useEffect(() => {
@@ -98,6 +99,15 @@ export default function AnalyzePage() {
     setLoading(true);
     setError("");
     setResult(null);
+    setProgress(0);
+
+    let interval: ReturnType<typeof setInterval>;
+    interval = setInterval(() => {
+      setProgress(prev => {
+        if (prev >= 90) { clearInterval(interval); return 90; }
+        return prev + Math.random() * 8 + 2;
+      });
+    }, 800);
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -122,12 +132,15 @@ export default function AnalyzePage() {
       }
 
       if (data.error) throw new Error(data.error);
+      setProgress(100);
       setResult(data);
       if (remainingCount !== null) setRemainingCount(prev => prev !== null ? prev - 1 : null);
     } catch (e) {
       setError("診断に失敗しました。URLを確認してください。");
     } finally {
+      clearInterval(interval);
       setLoading(false);
+      setProgress(0);
     }
   };
 
@@ -173,9 +186,20 @@ export default function AnalyzePage() {
 
         {/* ローディング */}
         {loading && (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-4xl mb-4 animate-pulse">🤖</div>
-            <p>AIがサイトを解析中です...</p>
+          <div className="py-16 text-center text-gray-400">
+            <p className="text-sm font-medium mb-4">サイトを解析中です...</p>
+            <div className="max-w-xs mx-auto">
+              <div className="flex justify-between text-xs text-gray-500 mb-1.5">
+                <span>解析中</span>
+                <span>{Math.min(Math.round(progress), 100)}%</span>
+              </div>
+              <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700 ease-out"
+                  style={{ width: `${Math.min(progress, 100)}%` }}
+                />
+              </div>
+            </div>
           </div>
         )}
 

@@ -200,7 +200,7 @@ export default function Home() {
 
       {/* FINAL CTA */}
       <section className="py-24 px-6 text-center">
-        <h2 className="text-4xl font-black tracking-tight mb-4">先行者になる、今。</h2>
+        <h2 className="text-4xl font-black tracking-tight mb-4">先行者になりましょう</h2>
         <p className="text-gray-400 mb-10">AIに選ばれるサイトになる第一歩。<br />リリース時に真っ先にご案内します。</p>
         <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-3 w-full max-w-md mx-auto">
           {!submitted ? (
