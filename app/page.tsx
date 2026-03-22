@@ -47,12 +47,22 @@ export default function Home() {
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-[#080C14]/90 backdrop-blur border-b border-white/5">
         <span className="text-xl font-bold tracking-tight">AI<span className="text-blue-500">Sight</span></span>
-        <button
-          onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
-          className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition"
-        >
-          先行登録する
-        </button>
+        <div className="flex items-center gap-4">
+          <a
+            href="https://www.nodetech.jp/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-gray-400 hover:text-white transition"
+          >
+            運営会社
+          </a>
+          <button
+            onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition"
+          >
+            先行登録する
+          </button>
+        </div>
       </nav>
 
       {/* HERO */}
