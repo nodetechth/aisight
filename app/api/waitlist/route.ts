@@ -6,8 +6,13 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
 export async function GET() {
-  const { count, error } = await supabase
+  const { count, error } = await supabaseAdmin
     .from('waiting_list')
     .select('*', { count: 'exact', head: true })
 
