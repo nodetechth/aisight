@@ -47,6 +47,13 @@ export default function NavBar() {
                 <p className="text-xs text-gray-500">ログイン中</p>
                 <p className="text-sm text-white truncate">{email}</p>
               </div>
+              <a
+                href="/mypage"
+                className="block w-full px-4 py-3 text-sm text-gray-300 hover:bg-white/5 text-left transition"
+                onClick={() => setOpen(false)}
+              >
+                マイページ
+              </a>
               <button
                 onClick={handleLogout}
                 className="w-full px-4 py-3 text-sm text-red-400 hover:bg-white/5 text-left transition"
