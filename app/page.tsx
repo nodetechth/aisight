@@ -92,7 +92,7 @@ export default function Home() {
         {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-12 mt-16">
-          {[[String(registrantCount), "先行登録者数"], ["5", "診断AIエンジン"], ["10秒", "診断にかかる時間"]].map(([num, label]) => (
+          {[[String(registrantCount), "先行登録者数"], ["4", "診断AIエンジン"], ["10秒", "診断にかかる時間"]].map(([num, label]) => (
             <div key={label} className="text-center">
               <div className="text-3xl font-black text-blue-400">{num}</div>
               <div className="text-xs text-gray-500 mt-1">{label}</div>
