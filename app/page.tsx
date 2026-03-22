@@ -37,12 +37,6 @@ export default function Home() {
       {/* NAV */}
       <nav className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-8 py-4 bg-[#080C14]/90 backdrop-blur border-b border-white/5">
         <span className="text-xl font-bold tracking-tight">AI<span className="text-blue-500">Sight</span></span>
-        <a
-          href="/analyze"
-          className="px-4 py-2 text-sm text-gray-300 hover:text-white border border-white/10 hover:border-white/30 rounded-lg transition"
-        >
-          無料で診断する
-        </a>
         <button
           onClick={() => document.querySelector("form")?.scrollIntoView({ behavior: "smooth", block: "center" })}
           className="px-5 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-sm font-medium transition"
