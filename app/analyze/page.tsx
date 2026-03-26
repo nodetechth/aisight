@@ -2,6 +2,14 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import NavBar from "@/app/components/NavBar";
+import TechnicalCheck from "@/components/diagnosis/TechnicalCheck";
+
+type HeadingNode = {
+  level: number;
+  text: string;
+  hasDefinition: boolean;
+  children: HeadingNode[];
+};
 
 type ScoreResult = {
   url: string;
@@ -23,6 +31,58 @@ type ScoreResult = {
     totalQueries: number;
     competitors: { query: string; sites: string[] }[];
   };
+  pageStructure?: {
+    headings: HeadingNode[];
+    h1Count: number;
+    hasFaq: boolean;
+    issues: string[];
+  };
+  metaDetails?: {
+    title: { value: string; length: number; status: "good" | "warning" | "error"; suggestion?: string };
+    description: { value: string; length: number; status: "good" | "warning" | "error"; suggestion?: string };
+    ogp: { title: string | null; description: string | null; image: string | null; hasOgp: boolean };
+    canonical: string | null;
+  };
+  citationStrategy?: {
+    press_release: {
+      priority: "high" | "medium" | "low";
+      recommendation: string;
+      suggested_platforms: string[];
+      checklist: string[];
+    };
+    google_business_profile: {
+      priority: "high" | "medium" | "low";
+      is_local_business: boolean;
+      recommendation: string;
+      checklist: string[];
+    };
+    portal_sites: {
+      priority: "high" | "medium" | "low";
+      detected_industry: string;
+      recommendation: string;
+      suggested_portals: string[];
+    };
+  };
+  technicalCheck?: {
+    llmsTxt: {
+      exists: boolean;
+      location: string | null;
+      content: string | null;
+    };
+    robotsTxt: {
+      exists: boolean;
+      crawlers: {
+        userAgent: string;
+        displayName: string;
+        allowed: boolean;
+        disallowRules: string[];
+      }[];
+      allBlocked: boolean;
+      partiallyBlocked: boolean;
+    };
+    score: number;
+    issues: string[];
+  };
   actionPlan?: {
     priority: "high" | "medium" | "low";
     item: string;
@@ -39,6 +99,125 @@ const SCORE_LABELS: Record<string, string> = {
   metaInfo: "メタ情報",
   aiCitation: "AI引用チェック",
 };
+
+// 見出しツリーコンポーネント（再帰的）
+function HeadingTree({ headings, depth = 0 }: { headings: HeadingNode[]; depth?: number }) {
+  return (
+    <ul className="text-gray-300">
+      {headings.map((h, i) => (
+        <li key={i} className="leading-relaxed">
+          <span className="text-gray-600">
+            {depth > 0 ? "│   ".repeat(depth - 1) + (i === headings.length - 1 ? "└── " : "├── ") : ""}
+          </span>
+          <span className="text-gray-500">H{h.level}:</span>{" "}
+          <span className="text-gray-200">{h.text}</span>{" "}
+          <span className={h.hasDefinition ? "text-green-400" : "text-red-400"}>
+            {h.hasDefinition ? "✓" : "✗"}
+          </span>
+          {h.children.length > 0 && (
+            <HeadingTree headings={h.children} depth={depth + 1} />
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+// サイテーション戦略カードコンポーネント（アコーディオン形式）
+function CitationStrategyCard({
+  icon,
+  title,
+  priority,
+  recommendation,
+  items,
+  itemLabel,
+  checklist,
+  badge,
+}: {
+  icon: string;
+  title: string;
+  priority: "high" | "medium" | "low";
+  recommendation: string;
+  items?: string[];
+  itemLabel?: string;
+  checklist?: string[];
+  badge?: string;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const priorityStyles = {
+    high: "bg-red-500/20 text-red-400",
+    medium: "bg-yellow-500/20 text-yellow-400",
+    low: "bg-gray-500/20 text-gray-400",
+  };
+
+  const priorityLabels = {
+    high: "優先度：高",
+    medium: "優先度：中",
+    low: "優先度：低",
+  };
+
+  return (
+    <div className="rounded-xl bg-white/2 border border-white/5 overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full p-4 flex items-center justify-between hover:bg-white/3 transition"
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">{icon}</span>
+          <span className="font-medium text-white">{title}</span>
+          {badge && (
+            <span className="text-xs px-2 py-0.5 rounded bg-blue-500/10 text-blue-400">
+              {badge}
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${priorityStyles[priority]}`}>
+            {priorityLabels[priority]}
+          </span>
+          <span className="text-gray-500 text-sm">{isOpen ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {isOpen && (
+        <div className="px-4 pb-4 pt-0 border-t border-white/5">
+          <p className="text-sm text-gray-300 mt-3 leading-relaxed">{recommendation}</p>
+
+          {items && items.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-2">{itemLabel || "推奨"}：</p>
+              <div className="flex flex-wrap gap-2">
+                {items.map((item, i) => (
+                  <span
+                    key={i}
+                    className="px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-400"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {checklist && checklist.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 mb-2">チェックリスト：</p>
+              <ul className="space-y-1">
+                {checklist.map((item, i) => (
+                  <li key={i} className="text-xs text-gray-400 flex items-start gap-2">
+                    <span className="text-gray-600">☐</span>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 // 有料ロック対象の指標
 const LOCKED_SCORES = ["aiCitation"];
@@ -309,20 +488,33 @@ export default function AnalyzePage() {
                   </span>
                 </div>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   {result.aiCitationReport.queries.map((q, i) => (
-                    <div key={i} className={`p-3 rounded-xl border text-sm ${
+                    <div key={i} className={`p-4 rounded-xl border text-sm ${
                       q.cited
                         ? "bg-green-500/5 border-green-500/20"
                         : "bg-white/2 border-white/5"
                     }`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span>{q.cited ? "✅" : "❌"}</span>
-                        <span className="text-gray-300 font-medium">「{q.query}」</span>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-lg">{q.cited ? "✅" : "❌"}</span>
+                        <span className={`font-medium ${q.cited ? "text-green-400" : "text-gray-400"}`}>
+                          {q.cited ? "AIに引用されました" : "今回の回答では引用されませんでした"}
+                        </span>
                       </div>
                       {q.cited && q.context && (
-                        <p className="text-xs text-gray-500 pl-6 leading-relaxed">
-                          {q.context}
+                        <div className="mt-3 pl-4 border-l-2 border-yellow-500/50">
+                          <p className="text-xs text-gray-500 mb-1.5">AIの回答より：</p>
+                          <blockquote className="bg-yellow-500/10 rounded-lg px-3 py-2 text-sm text-gray-200 leading-relaxed">
+                            "{q.context}"
+                          </blockquote>
+                          <p className="text-xs text-gray-500 mt-2">
+                            ─ Perplexity AI 「{q.query}」
+                          </p>
+                        </div>
+                      )}
+                      {!q.cited && (
+                        <p className="text-xs text-gray-500 pl-7">
+                          クエリ：「{q.query}」
                         </p>
                       )}
                     </div>
@@ -358,6 +550,238 @@ export default function AnalyzePage() {
                 <div className="flex items-center gap-2 text-gray-500 text-sm">
                   <span>🔒</span>
                   <span>競合比較スコア</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
+              </div>
+            )}
+
+            {/* ページ構造の可視化 - Proのみ */}
+            {isPro ? (
+              result.pageStructure && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">📋 ページ構造</h3>
+                  <p className="text-xs text-gray-500 mb-4">AIが読みやすい見出し構造になっているか</p>
+
+                  {/* ステータスバッジ */}
+                  <div className="flex flex-wrap gap-2 mb-4">
+                    <span className={`px-2 py-1 rounded-lg text-xs ${
+                      result.pageStructure.h1Count === 1
+                        ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                        : "bg-yellow-500/10 border border-yellow-500/20 text-yellow-400"
+                    }`}>
+                      {result.pageStructure.h1Count === 1 ? "✓" : "⚠"} H1タグ（{result.pageStructure.h1Count}個）
+                    </span>
+                    <span className={`px-2 py-1 rounded-lg text-xs ${
+                      result.pageStructure.hasFaq
+                        ? "bg-green-500/10 border border-green-500/20 text-green-400"
+                        : "bg-gray-500/10 border border-gray-500/20 text-gray-400"
+                    }`}>
+                      {result.pageStructure.hasFaq ? "✓ FAQセクションあり" : "FAQセクションなし"}
+                    </span>
+                  </div>
+
+                  {/* 問題点 */}
+                  {result.pageStructure.issues.length > 0 && (
+                    <div className="mb-4 p-3 rounded-xl bg-yellow-500/5 border border-yellow-500/20">
+                      {result.pageStructure.issues.map((issue, i) => (
+                        <p key={i} className="text-xs text-yellow-400 flex items-center gap-2">
+                          <span>⚠</span> {issue}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 見出しツリー */}
+                  {result.pageStructure.headings.length > 0 && (
+                    <div className="p-3 rounded-xl bg-white/2 border border-white/5 font-mono text-xs">
+                      <p className="text-gray-500 mb-2">見出し構造：</p>
+                      <HeadingTree headings={result.pageStructure.headings} />
+                    </div>
+                  )}
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>ページ構造の可視化</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
+              </div>
+            )}
+
+            {/* メタ情報詳細表示 - Proのみ */}
+            {isPro ? (
+              result.metaDetails && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">🔍 メタ情報</h3>
+                  <p className="text-xs text-gray-500 mb-4">AIが最初に読む情報</p>
+
+                  <div className="flex flex-col gap-3">
+                    {/* Title */}
+                    <div className="p-3 rounded-xl bg-white/2 border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 font-medium">title</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          result.metaDetails.title.status === "good"
+                            ? "bg-green-500/10 text-green-400"
+                            : result.metaDetails.title.status === "warning"
+                            ? "bg-yellow-500/10 text-yellow-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}>
+                          {result.metaDetails.title.length}文字
+                          {result.metaDetails.title.status === "good" ? " ✓" : " ⚠"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-200 break-all">
+                        {result.metaDetails.title.value || "(未設定)"}
+                      </p>
+                      {result.metaDetails.title.suggestion && (
+                        <p className="mt-2 text-xs text-yellow-400">
+                          → {result.metaDetails.title.suggestion}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Description */}
+                    <div className="p-3 rounded-xl bg-white/2 border border-white/5">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs text-gray-400 font-medium">description</span>
+                        <span className={`text-xs px-2 py-0.5 rounded ${
+                          result.metaDetails.description.status === "good"
+                            ? "bg-green-500/10 text-green-400"
+                            : result.metaDetails.description.status === "warning"
+                            ? "bg-yellow-500/10 text-yellow-400"
+                            : "bg-red-500/10 text-red-400"
+                        }`}>
+                          {result.metaDetails.description.length}文字
+                          {result.metaDetails.description.status === "good" ? " ✓" : result.metaDetails.description.length === 0 ? " ✗" : " ⚠"}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-200 break-all">
+                        {result.metaDetails.description.value || "(未設定)"}
+                      </p>
+                      {result.metaDetails.description.suggestion && (
+                        <p className="mt-2 text-xs text-yellow-400">
+                          → {result.metaDetails.description.suggestion}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* OGP & Canonical */}
+                    <div className="flex gap-3">
+                      <div className={`flex-1 p-3 rounded-xl border ${
+                        result.metaDetails.ogp.hasOgp
+                          ? "bg-green-500/5 border-green-500/20"
+                          : "bg-red-500/5 border-red-500/20"
+                      }`}>
+                        <p className="text-xs font-medium mb-1">
+                          {result.metaDetails.ogp.hasOgp ? "✓" : "✗"} OGP
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {result.metaDetails.ogp.hasOgp ? "設定済み" : "未設定（SNS・AIのプレビューに影響）"}
+                        </p>
+                      </div>
+                      <div className={`flex-1 p-3 rounded-xl border ${
+                        result.metaDetails.canonical
+                          ? "bg-green-500/5 border-green-500/20"
+                          : "bg-gray-500/5 border-gray-500/20"
+                      }`}>
+                        <p className="text-xs font-medium mb-1">
+                          {result.metaDetails.canonical ? "✓" : "−"} canonical
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {result.metaDetails.canonical ? "設定済み" : "未設定"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>メタ情報詳細</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
+              </div>
+            )}
+
+            {/* 技術的整備チェック - Proのみ */}
+            {isPro ? (
+              result.technicalCheck && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">🔧 技術的整備</h3>
+                  <p className="text-xs text-gray-500 mb-4">AIクローラーの受け入れ状況</p>
+                  <TechnicalCheck technicalCheck={result.technicalCheck} />
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>技術的整備チェック</span>
+                </div>
+                <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
+                  有料プランで解放 →
+                </a>
+              </div>
+            )}
+
+            {/* サイテーション戦略 - Proのみ */}
+            {isPro ? (
+              result.citationStrategy && (
+                <div className="mt-4 p-5 rounded-2xl bg-white/3 border border-white/5">
+                  <h3 className="text-sm font-bold text-white mb-3">🚀 サイテーション戦略</h3>
+                  <p className="text-xs text-gray-500 mb-4">AIに引用されるための外部施策</p>
+
+                  <div className="flex flex-col gap-3">
+                    {/* プレスリリース */}
+                    <CitationStrategyCard
+                      icon="📰"
+                      title="プレスリリース配信"
+                      priority={result.citationStrategy.press_release.priority}
+                      recommendation={result.citationStrategy.press_release.recommendation}
+                      items={result.citationStrategy.press_release.suggested_platforms}
+                      itemLabel="推奨プラットフォーム"
+                      checklist={result.citationStrategy.press_release.checklist}
+                    />
+
+                    {/* Googleビジネスプロフィール */}
+                    <CitationStrategyCard
+                      icon="📍"
+                      title="Googleビジネスプロフィール"
+                      priority={result.citationStrategy.google_business_profile.priority}
+                      recommendation={result.citationStrategy.google_business_profile.recommendation}
+                      badge={result.citationStrategy.google_business_profile.is_local_business ? "ローカルビジネス" : undefined}
+                      checklist={result.citationStrategy.google_business_profile.checklist}
+                    />
+
+                    {/* ポータルサイト */}
+                    <CitationStrategyCard
+                      icon="🌐"
+                      title="業界ポータルサイト"
+                      priority={result.citationStrategy.portal_sites.priority}
+                      recommendation={result.citationStrategy.portal_sites.recommendation}
+                      items={result.citationStrategy.portal_sites.suggested_portals}
+                      itemLabel="推奨サイト"
+                      badge={result.citationStrategy.portal_sites.detected_industry}
+                    />
+                  </div>
+                </div>
+              )
+            ) : (
+              <div className="mt-4 flex items-center justify-between p-4 rounded-2xl bg-white/2 border border-white/5">
+                <div className="flex items-center gap-2 text-gray-500 text-sm">
+                  <span>🔒</span>
+                  <span>サイテーション戦略</span>
                 </div>
                 <a href="/upgrade" className="text-xs text-blue-400 hover:text-blue-300 transition">
                   有料プランで解放 →

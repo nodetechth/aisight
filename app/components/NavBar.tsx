@@ -54,6 +54,13 @@ export default function NavBar() {
               >
                 マイページ
               </a>
+              <a
+                href="/dashboard/monitoring"
+                className="block w-full px-4 py-3 text-sm text-gray-300 hover:bg-white/5 text-left transition"
+                onClick={() => setOpen(false)}
+              >
+                モニタリング
+              </a>
               <button
                 onClick={handleLogout}
                 className="w-full px-4 py-3 text-sm text-red-400 hover:bg-white/5 text-left transition"

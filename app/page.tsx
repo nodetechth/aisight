@@ -102,7 +102,7 @@ export default function Home() {
         {error && <p className="mt-3 text-red-400 text-sm">{error}</p>}
 
         <div className="flex gap-12 mt-16">
-          {[[String(registrantCount), "先行登録者数"], ["4", "診断AIエンジン"], ["10秒", "診断にかかる時間"]].map(([num, label]) => (
+          {[[String(registrantCount), "先行登録者数"], ["6", "診断指標"], ["10秒", "診断にかかる時間"]].map(([num, label]) => (
             <div key={label} className="text-center">
               <div className="text-3xl font-black text-blue-400">{num}</div>
               <div className="text-xs text-gray-500 mt-1">{label}</div>
@@ -139,7 +139,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-8">
             {[
               ["01", "URLを入力するだけ", "診断したいWebサイトのURLを入力。アカウント登録不要、30秒で完了。"],
-              ["02", "5つのAIエンジンが検証", "ChatGPT・Gemini・Perplexity・Claude・Yahoo! AIが実際にあなたのサイトをどう認識しているかをチェック。"],
+              ["02", "AIがリアルタイム検証", "実際のAI検索エンジンに質問を投げて、あなたのサイトが回答に引用されるかをチェック。"],
               ["03", "スコアと改善策を取得", "100点満点のAIEOスコアと、優先度付きの改善アクションリストを即座に受け取る。"],
             ].map(([num, title, desc]) => (
               <div key={num}>
