@@ -205,6 +205,23 @@ export async function POST(req: NextRequest) {
       aiCitationReport.queries.length
     );
 
+    // 診断結果をDBに保存（ログインユーザーのみ）
+    const domain = new URL(url).hostname.replace("www.", "");
+    let scoreComparison: { previous: number | null; change: number | null } | null = null;
+    if (userId) {
+      scoreComparison = await saveDiagnosisResult(
+        userId,
+        domain,
+        url,
+        total,
+        scores,
+        technicalScore,
+        aiCitationReport.cited,
+        aiCitationReport.industry,
+        aiCitationReport.region
+      );
+    }
+
     // モニタリング処理（ユーザーがログイン済みでProプランの場合のみ）
     let monitoringResults: MonitoringCheckResult[] | null = null;
     if (userId && analysisLimit.isPro) {
@@ -238,6 +255,7 @@ export async function POST(req: NextRequest) {
       citationStrategy,
       actionPlan,
       monitoringResults,
+      scoreComparison,
       checkedAt: new Date().toISOString(),
     });
   } catch (e) {
@@ -315,6 +333,56 @@ async function runMonitoringForUser(
   } catch {
     // モニタリングエラーは診断結果に影響させない
     return null;
+  }
+}
+
+// 診断結果を保存し、前回との比較を返す
+async function saveDiagnosisResult(
+  userId: string,
+  domain: string,
+  url: string,
+  totalScore: number,
+  scores: Record<string, number>,
+  technicalScore: number,
+  cited: boolean,
+  industry: string,
+  region: string
+): Promise<{ previous: number | null; change: number | null }> {
+  const supabase = createSupabaseClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+
+  try {
+    // 前回の結果を取得
+    const { data: prevResult } = await supabase
+      .from("diagnosis_results")
+      .select("total_score")
+      .eq("user_id", userId)
+      .eq("domain", domain)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    const previous = prevResult?.total_score ?? null;
+    const change = previous !== null ? totalScore - previous : null;
+
+    // 新しい結果を保存
+    await supabase.from("diagnosis_results").insert({
+      user_id: userId,
+      domain,
+      url,
+      total_score: totalScore,
+      scores,
+      technical_score: technicalScore,
+      cited,
+      industry,
+      region,
+    });
+
+    return { previous, change };
+  } catch {
+    return { previous: null, change: null };
   }
 }
 

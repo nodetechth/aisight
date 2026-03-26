@@ -88,6 +88,10 @@ type ScoreResult = {
     item: string;
     action: string;
   }[];
+  scoreComparison?: {
+    previous: number | null;
+    change: number | null;
+  } | null;
   checkedAt: string;
 };
 
@@ -389,8 +393,23 @@ export default function AnalyzePage() {
             <div className="bg-white/3 border border-white/10 rounded-2xl p-8">
               <div className="flex items-start justify-between mb-6">
                 <div>
-                  <div className="text-8xl font-black bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent leading-none">
-                    {result.total}
+                  <div className="flex items-end gap-3">
+                    <div className="text-8xl font-black bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent leading-none">
+                      {result.total}
+                    </div>
+                    {result.scoreComparison?.change !== null && result.scoreComparison?.change !== undefined && (
+                      <div className={`mb-2 px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 ${
+                        result.scoreComparison.change > 0
+                          ? "bg-green-500/20 text-green-400 border border-green-500/30"
+                          : result.scoreComparison.change < 0
+                          ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                          : "bg-gray-500/20 text-gray-400 border border-gray-500/30"
+                      }`}>
+                        {result.scoreComparison.change > 0 ? "+" : ""}
+                        {result.scoreComparison.change}点
+                        {result.scoreComparison.change > 0 ? " ↑" : result.scoreComparison.change < 0 ? " ↓" : ""}
+                      </div>
+                    )}
                   </div>
                   <div className="text-sm text-gray-500 mt-2">AIEOスコア / 100点</div>
                 </div>
