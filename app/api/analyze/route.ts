@@ -378,6 +378,7 @@ async function saveDiagnosisResult(
       cited,
       industry,
       region,
+      detected_industry: industry,
     });
 
     return { previous, change };
