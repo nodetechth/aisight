@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase";
 import NavBar from "@/app/components/NavBar";
 import TechnicalCheck from "@/components/diagnosis/TechnicalCheck";
+import { isSeoBoostingAction, calculateSeoCoverageRate, type SeoCompletionStatus } from "@/lib/seo-boosting-actions";
 
 type HeadingNode = {
   level: number;
@@ -243,6 +244,22 @@ function getGrade(total: number) {
   return { label: "D", color: "text-red-400", msg: "AIにほぼ認識されていません。早急な改善が必要です" };
 }
 
+// SEO基礎対策の完了状態を診断結果から算出
+function getSeoCompletionStatus(result: ScoreResult): SeoCompletionStatus {
+  const SCORE_THRESHOLD = 12; // 20点満点中12点（60%）以上で完了とみなす
+  return {
+    llmsTxt: result.technicalCheck?.llmsTxt.exists ?? false,
+    robotsTxt: result.technicalCheck
+      ? !result.technicalCheck.robotsTxt.allBlocked && !result.technicalCheck.robotsTxt.partiallyBlocked
+      : false,
+    structuredData: result.scores.structuredData >= SCORE_THRESHOLD,
+    pressRelease: result.citationStrategy?.press_release.priority !== "high",
+    googleBusiness: result.citationStrategy?.google_business_profile.priority !== "high",
+    portalSites: result.citationStrategy?.portal_sites.priority !== "high",
+    eeat: result.scores.answerCapsule >= SCORE_THRESHOLD,
+  };
+}
+
 export default function AnalyzePage() {
   const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -251,12 +268,15 @@ export default function AnalyzePage() {
   const [isPro, setIsPro] = useState(false);
   const [remainingCount, setRemainingCount] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
+  const [diagnosisCount, setDiagnosisCount] = useState<number | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
-    const checkPlan = async () => {
+    const checkPlanAndHistory = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+
+      // プラン情報を取得
       const { data } = await supabase
         .from("user_plans")
         .select("plan, monthly_analysis_count, analysis_count_reset_at")
@@ -272,8 +292,15 @@ export default function AnalyzePage() {
         const count = shouldReset ? 0 : (data.monthly_analysis_count ?? 0);
         setRemainingCount(5 - count);
       }
+
+      // 診断履歴件数を取得（オンボーディング表示用）
+      const { count } = await supabase
+        .from("diagnosis_results")
+        .select("*", { count: "exact", head: true })
+        .eq("user_id", user.id);
+      setDiagnosisCount(count ?? 0);
     };
-    checkPlan();
+    checkPlanAndHistory();
   }, []);
 
   const handleAnalyze = async () => {
@@ -361,6 +388,21 @@ export default function AnalyzePage() {
           </p>
         )}
 
+        {/* オンボーディングメッセージ（診断履歴0件のユーザー向け） */}
+        {diagnosisCount === 0 && !result && (
+          <div className="mb-8 p-5 rounded-2xl bg-gradient-to-r from-blue-500/10 to-indigo-500/10 border border-blue-500/20">
+            <p className="text-sm text-gray-300 leading-relaxed mb-2">
+              はじめまして！AISightへようこそ。
+            </p>
+            <p className="text-sm text-gray-300 leading-relaxed mb-3">
+              まずはあなたのサイトのURLを入力して、AIからどのように見られているかを診断してみましょう。
+            </p>
+            <p className="text-xs text-gray-500 leading-relaxed">
+              AISightのチェックリストをクリアすると、SEOの基礎対策も自然と整っていきます
+            </p>
+          </div>
+        )}
+
         {error && (
           <div className="px-4 py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm mb-6">
             {error}
@@ -432,6 +474,31 @@ export default function AnalyzePage() {
                 </div>
               )}
             </div>
+
+            {/* SEO基礎対策カバー率 - Proのみ */}
+            {isPro && (
+              (() => {
+                const seoStatus = getSeoCompletionStatus(result);
+                const coverageRate = calculateSeoCoverageRate(seoStatus);
+                return (
+                  <div className="bg-white/3 border border-white/10 rounded-2xl p-6">
+                    <div className="flex items-center justify-between mb-3">
+                      <h2 className="font-bold text-lg">SEO基礎対策カバー率</h2>
+                      <span className="text-2xl font-black text-green-400">{coverageRate}%</span>
+                    </div>
+                    <div className="h-2.5 bg-white/5 rounded-full overflow-hidden mb-3">
+                      <div
+                        className="h-full bg-gradient-to-r from-green-500 to-emerald-400 rounded-full transition-all duration-1000"
+                        style={{ width: `${coverageRate}%` }}
+                      />
+                    </div>
+                    <p className="text-xs text-gray-500 leading-relaxed">
+                      LLMOの施策はSEOの基礎対策と重複しています
+                    </p>
+                  </div>
+                );
+              })()
+            )}
 
             {/* 各指標 */}
             <div className="bg-white/3 border border-white/10 rounded-2xl p-6 space-y-5">
@@ -825,8 +892,18 @@ export default function AnalyzePage() {
                         }`}>
                           {plan.priority === "high" ? "優先度：高" : plan.priority === "medium" ? "優先度：中" : "優先度：低"}
                         </span>
-                        <div>
-                          <p className="text-sm font-medium text-white mb-1">{plan.item}</p>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <p className="text-sm font-medium text-white">{plan.item}</p>
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-blue-500/20 text-blue-400">
+                              LLMO
+                            </span>
+                            {isSeoBoostingAction(plan.item) && (
+                              <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-green-500/20 text-green-400">
+                                SEO↑
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs text-gray-400 leading-relaxed">{plan.action}</p>
                         </div>
                       </div>
